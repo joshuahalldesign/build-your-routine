@@ -1,6 +1,7 @@
 import fetch from 'node-fetch';
 
 export default async function handler(req, res) {
+  // CORS
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -16,7 +17,7 @@ export default async function handler(req, res) {
 
   const { bundle_product_id, items } = req.body;
 
-  if (!bundle_product_id || !items?.length) {
+  if (!bundle_product_id || !Array.isArray(items) || !items.length) {
     return res.status(400).json({ error: 'Invalid payload' });
   }
 
