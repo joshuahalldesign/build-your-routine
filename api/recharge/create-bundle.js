@@ -6,13 +6,9 @@ export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST')
     return res.status(405).json({ error: 'Method not allowed' });
-  }
 
   try {
     const { bundle_product_id, items } = req.body;
@@ -24,51 +20,40 @@ export default async function handler(req, res) {
     console.log('📦 Incoming bundle payload', { bundle_product_id, items });
 
     // ------------------------------
-    // 1️⃣ CREATE STOREFRONT SESSION
+    // 1️⃣ STOREFRONT SESSION
     // ------------------------------
-    const form = new FormData();
-    form.append('storeIdentifier', process.env.RECHARGE_STORE_IDENTIFIER);
-
     const sessionRes = await fetch(
-      'https://storefront.rechargepayments.com/session',
+      'https://api.rechargepayments.com/storefront/session',
       {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'X-Recharge-Storefront-Access-Token':
             process.env.RECHARGE_STOREFRONT_TOKEN
         },
-        body: form
+        body: JSON.stringify({
+          store_identifier: process.env.RECHARGE_STORE_IDENTIFIER
+        })
       }
     );
 
-    const sessionText = await sessionRes.text();
-
-    let sessionData;
-    try {
-      sessionData = JSON.parse(sessionText);
-    } catch {
-      console.error('❌ Session parse failed:', sessionText);
-      return res.status(500).json({
-        error: 'Recharge session parse failed',
-        raw: sessionText
-      });
-    }
+    const sessionData = await sessionRes.json();
 
     if (!sessionRes.ok || !sessionData?.token) {
-      console.error('❌ Recharge session failed', sessionData);
+      console.error('❌ Session failed', sessionData);
       return res.status(401).json({
         error: 'Recharge session failed',
         details: sessionData
       });
     }
 
-    console.log('🔑 Recharge session token OK');
+    console.log('🔑 Session token OK');
 
     // ------------------------------
-    // 2️⃣ CREATE BUNDLE SELECTION
+    // 2️⃣ CREATE BUNDLE
     // ------------------------------
     const bundleRes = await fetch(
-      'https://storefront.rechargepayments.com/bundles/selection',
+      'https://api.rechargepayments.com/storefront/bundles/selection',
       {
         method: 'POST',
         headers: {
@@ -82,18 +67,7 @@ export default async function handler(req, res) {
       }
     );
 
-    const bundleText = await bundleRes.text();
-
-    let bundleData;
-    try {
-      bundleData = JSON.parse(bundleText);
-    } catch {
-      console.error('❌ Bundle parse failed:', bundleText);
-      return res.status(500).json({
-        error: 'Bundle parse failed',
-        raw: bundleText
-      });
-    }
+    const bundleData = await bundleRes.json();
 
     if (!bundleRes.ok) {
       console.error('❌ Bundle creation failed', bundleData);
