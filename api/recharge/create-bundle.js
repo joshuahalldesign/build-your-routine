@@ -1,29 +1,30 @@
+import fetch from 'node-fetch';
 import FormData from 'form-data';
 
 export default async function handler(req, res) {
-  // ------------------------------
-  // CORS
-  // ------------------------------
-  res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
-  }
-
   try {
+    // ------------------------------
+    // CORS
+    // ------------------------------
+    res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+
+    if (req.method !== 'POST') {
+      return res.status(405).json({ error: 'Method not allowed' });
+    }
+
     const { bundle_product_id, items } = req.body;
 
     if (!bundle_product_id || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Invalid payload' });
     }
 
-    console.log('📦 Incoming bundle payload', { bundle_product_id, items });
+    console.log('📦 Incoming bundle payload', bundle_product_id, items);
 
     // ------------------------------
     // 1️⃣ CREATE STOREFRONT SESSION
@@ -38,7 +39,7 @@ export default async function handler(req, res) {
         headers: {
           'X-Recharge-Storefront-Access-Token':
             process.env.RECHARGE_STOREFRONT_TOKEN,
-          ...form.getHeaders() // 🔥 REQUIRED
+          ...form.getHeaders()
         },
         body: form
       }
@@ -64,7 +65,7 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('🔑 Recharge session token OK');
+    console.log('🔑 Recharge token OK');
 
     // ------------------------------
     // 2️⃣ CREATE BUNDLE SELECTION
@@ -104,12 +105,12 @@ export default async function handler(req, res) {
       });
     }
 
-    console.log('✅ Bundle selection created');
+    console.log('✅ Bundle created');
 
     return res.status(200).json(bundleData);
 
   } catch (err) {
-    console.error('🔥 Server error', err);
+    console.error('🔥 FUNCTION CRASH', err);
     return res.status(500).json({
       error: 'Internal server error',
       message: err.message
