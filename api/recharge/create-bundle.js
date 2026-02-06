@@ -1,7 +1,10 @@
 import fetch from 'node-fetch';
+import FormData from 'form-data';
 
 export default async function handler(req, res) {
+  // ------------------------------
   // CORS
+  // ------------------------------
   if (req.method === 'OPTIONS') {
     res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -15,37 +18,69 @@ export default async function handler(req, res) {
 
   res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
 
-  const { bundle_product_id, items } = req.body;
-
-  if (!bundle_product_id || !Array.isArray(items) || !items.length) {
-    return res.status(400).json({ error: 'Invalid payload' });
-  }
-
-  const rechargeRes = await fetch(
-    'https://storefront.rechargepayments.com/bundles/selection',
-    {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Recharge-Storefront-Access-Token': process.env.RECHARGE_STOREFRONT_TOKEN,
-        'X-Recharge-Store-Identifier': process.env.RECHARGE_STORE_IDENTIFIER
-      },
-      body: JSON.stringify({ bundle_product_id, items })
-    }
-  );
-
-  const text = await rechargeRes.text();
-
   try {
-    const json = JSON.parse(text);
-    if (!rechargeRes.ok) {
-      return res.status(400).json(json);
+    const { bundle_product_id, items } = req.body;
+
+    if (!bundle_product_id || !Array.isArray(items) || !items.length) {
+      return res.status(400).json({ error: 'Invalid payload' });
     }
-    return res.status(200).json(json);
-  } catch {
+
+    console.log('📦 Incoming bundle payload', { bundle_product_id, items });
+
+    // ------------------------------
+    // BUILD MULTIPART FORM DATA
+    // ------------------------------
+    const form = new FormData();
+    form.append('bundle_product_id', bundle_product_id);
+
+    items.forEach((item, index) => {
+      form.append(`items[${index}][variant_id]`, item.variant_id);
+      form.append(`items[${index}][quantity]`, item.quantity);
+    });
+
+    // ------------------------------
+    // SEND TO RECHARGE
+    // ------------------------------
+    const rechargeRes = await fetch(
+      'https://storefront.rechargepayments.com/bundles/selection',
+      {
+        method: 'POST',
+        headers: {
+          'X-Recharge-Storefront-Access-Token':
+            process.env.RECHARGE_STOREFRONT_TOKEN,
+          'X-Recharge-Store-Identifier':
+            process.env.RECHARGE_STORE_IDENTIFIER,
+          ...form.getHeaders()
+        },
+        body: form
+      }
+    );
+
+    const raw = await rechargeRes.text();
+    console.log('📥 Recharge raw response:', raw);
+
+    let data;
+    try {
+      data = JSON.parse(raw);
+    } catch {
+      return res.status(500).json({
+        error: 'Recharge response not JSON',
+        raw
+      });
+    }
+
+    if (!rechargeRes.ok) {
+      return res.status(400).json(data);
+    }
+
+    console.log('✅ Bundle selection created');
+    return res.status(200).json(data);
+
+  } catch (err) {
+    console.error('🔥 Server error', err);
     return res.status(500).json({
-      error: 'Recharge response not JSON',
-      raw: text
+      error: 'Internal server error',
+      message: err.message
     });
   }
 }
