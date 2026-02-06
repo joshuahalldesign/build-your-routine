@@ -1,3 +1,5 @@
+import FormData from 'form-data';
+
 export default async function handler(req, res) {
   // ------------------------------
   // CORS
@@ -24,7 +26,7 @@ export default async function handler(req, res) {
     console.log('📦 Incoming bundle payload', { bundle_product_id, items });
 
     // ------------------------------
-    // 1️⃣ AUTH SESSION (multipart/form-data)
+    // 1️⃣ CREATE STOREFRONT SESSION
     // ------------------------------
     const form = new FormData();
     form.append('storeIdentifier', process.env.RECHARGE_STORE_IDENTIFIER);
@@ -34,9 +36,9 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
-          // IMPORTANT: do NOT set Content-Type manually
           'X-Recharge-Storefront-Access-Token':
-            process.env.RECHARGE_STOREFRONT_TOKEN
+            process.env.RECHARGE_STOREFRONT_TOKEN,
+          ...form.getHeaders() // 🔥 REQUIRED
         },
         body: form
       }
