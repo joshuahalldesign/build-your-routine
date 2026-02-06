@@ -1,5 +1,4 @@
 import fetch from 'node-fetch';
-import FormData from 'form-data';
 
 export default async function handler(req, res) {
   // ------------------------------
@@ -28,14 +27,14 @@ export default async function handler(req, res) {
     console.log('📦 Incoming bundle payload', { bundle_product_id, items });
 
     // ------------------------------
-    // BUILD MULTIPART FORM DATA
+    // BUILD URL-ENCODED BODY
     // ------------------------------
-    const form = new FormData();
-    form.append('bundle_product_id', bundle_product_id);
+    const body = new URLSearchParams();
+    body.append('bundle_product_id', bundle_product_id);
 
     items.forEach((item, index) => {
-      form.append(`items[${index}][variant_id]`, item.variant_id);
-      form.append(`items[${index}][quantity]`, item.quantity);
+      body.append(`items[${index}][variant_id]`, item.variant_id);
+      body.append(`items[${index}][quantity]`, item.quantity);
     });
 
     // ------------------------------
@@ -46,13 +45,13 @@ export default async function handler(req, res) {
       {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
           'X-Recharge-Storefront-Access-Token':
             process.env.RECHARGE_STOREFRONT_TOKEN,
           'X-Recharge-Store-Identifier':
-            process.env.RECHARGE_STORE_IDENTIFIER,
-          ...form.getHeaders()
+            process.env.RECHARGE_STORE_IDENTIFIER
         },
-        body: form
+        body: body.toString()
       }
     );
 
