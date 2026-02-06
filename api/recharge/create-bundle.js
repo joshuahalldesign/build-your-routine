@@ -1,8 +1,9 @@
 import fetch from 'node-fetch';
-import FormData from 'form-data';
 
 export default async function handler(req, res) {
-  // ---------------- CORS ----------------
+  // ------------------------------
+  // CORS
+  // ------------------------------
   res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -22,54 +23,24 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid payload' });
     }
 
-    console.log('📦 Incoming bundle payload', { bundle_product_id, items });
+    console.log('📦 Incoming bundle payload', {
+      bundle_product_id,
+      items
+    });
 
-    // -------- 1️⃣ CREATE STOREFRONT SESSION --------
-    const form = new FormData();
-    form.append('storeIdentifier', process.env.RECHARGE_STORE_IDENTIFIER);
-
-    const sessionRes = await fetch(
-      'https://storefront.rechargepayments.com/session',
-      {
-        method: 'POST',
-        headers: {
-          'X-Recharge-Storefront-Access-Token':
-            process.env.RECHARGE_STOREFRONT_TOKEN
-        },
-        body: form
-      }
-    );
-
-    const sessionText = await sessionRes.text();
-    let sessionData;
-
-    try {
-      sessionData = JSON.parse(sessionText);
-    } catch {
-      console.error('❌ Session parse failed:', sessionText);
-      return res.status(500).json({
-        error: 'Recharge session parse failed',
-        raw: sessionText
-      });
-    }
-
-    if (!sessionData?.token) {
-      return res.status(401).json({
-        error: 'Recharge auth failed',
-        details: sessionData
-      });
-    }
-
-    console.log('🔑 Recharge session OK');
-
-    // -------- 2️⃣ CREATE BUNDLE SELECTION --------
-    const bundleRes = await fetch(
+    // ------------------------------
+    // CREATE BUNDLE SELECTION
+    // ------------------------------
+    const rechargeRes = await fetch(
       'https://storefront.rechargepayments.com/bundles/selection',
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${sessionData.token}`
+          'X-Recharge-Storefront-Access-Token':
+            process.env.RECHARGE_STOREFRONT_TOKEN,
+          'X-Recharge-Store-Identifier':
+            process.env.RECHARGE_STORE_IDENTIFIER
         },
         body: JSON.stringify({
           bundle_product_id,
@@ -78,28 +49,27 @@ export default async function handler(req, res) {
       }
     );
 
-    const bundleText = await bundleRes.text();
-    let bundleData;
+    const text = await rechargeRes.text();
+    console.log('📥 Recharge raw response:', text);
 
+    let data;
     try {
-      bundleData = JSON.parse(bundleText);
+      data = JSON.parse(text);
     } catch {
-      console.error('❌ Bundle parse failed:', bundleText);
       return res.status(500).json({
-        error: 'Bundle parse failed',
-        raw: bundleText
+        error: 'Recharge response not JSON',
+        raw: text
       });
     }
 
-    if (!bundleRes.ok) {
-      return res.status(400).json({
-        error: 'Bundle creation failed',
-        details: bundleData
-      });
+    if (!rechargeRes.ok) {
+      console.error('❌ Recharge error', data);
+      return res.status(400).json(data);
     }
 
-    console.log('✅ Bundle created');
-    return res.status(200).json(bundleData);
+    console.log('✅ Bundle selection created');
+
+    return res.status(200).json(data);
 
   } catch (err) {
     console.error('🔥 Server error', err);
