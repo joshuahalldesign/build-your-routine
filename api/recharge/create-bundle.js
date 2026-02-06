@@ -1,4 +1,19 @@
 export default async function handler(req, res) {
+  /* ===============================
+     CORS HEADERS — REQUIRED
+  =============================== */
+  res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    'Content-Type, Authorization'
+  );
+
+  // 🔑 Preflight request
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -6,7 +21,7 @@ export default async function handler(req, res) {
   try {
     const { bundle_product_id, items } = req.body;
 
-    if (!bundle_product_id || !items?.length) {
+    if (!bundle_product_id || !Array.isArray(items) || !items.length) {
       return res.status(400).json({ error: 'Invalid payload' });
     }
 
@@ -15,7 +30,10 @@ export default async function handler(req, res) {
       items
     });
 
-    // 1️⃣ Create Recharge session using storefront token
+    /* ===============================
+       1️⃣ AUTH — STOREFRONT TOKEN
+    =============================== */
+
     const authRes = await fetch(
       'https://storefront.rechargepayments.com/auth/login',
       {
@@ -31,9 +49,16 @@ export default async function handler(req, res) {
       }
     );
 
-    const authData = await authRes.json();
+    const authText = await authRes.text();
+    let authData;
 
-    if (!authData?.token) {
+    try {
+      authData = JSON.parse(authText);
+    } catch {
+      throw new Error(`Auth JSON parse failed: ${authText}`);
+    }
+
+    if (!authRes.ok || !authData?.token) {
       console.error('❌ Recharge auth failed', authData);
       return res.status(401).json({
         error: 'Recharge authentication failed',
@@ -43,7 +68,10 @@ export default async function handler(req, res) {
 
     console.log('🔑 Recharge session token created');
 
-    // 2️⃣ Create bundle selection
+    /* ===============================
+       2️⃣ CREATE BUNDLE SELECTION
+    =============================== */
+
     const bundleRes = await fetch(
       'https://storefront.rechargepayments.com/bundles/selection',
       {
@@ -59,7 +87,14 @@ export default async function handler(req, res) {
       }
     );
 
-    const bundleData = await bundleRes.json();
+    const bundleText = await bundleRes.text();
+    let bundleData;
+
+    try {
+      bundleData = JSON.parse(bundleText);
+    } catch {
+      throw new Error(`Bundle JSON parse failed: ${bundleText}`);
+    }
 
     if (!bundleRes.ok) {
       console.error('❌ Bundle creation failed', bundleData);
