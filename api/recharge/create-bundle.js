@@ -24,20 +24,21 @@ export default async function handler(req, res) {
     console.log('📦 Incoming bundle payload', { bundle_product_id, items });
 
     // ------------------------------
-    // 1️⃣ CREATE STOREFRONT SESSION (CORRECT)
+    // 1️⃣ AUTH SESSION (multipart/form-data)
     // ------------------------------
+    const form = new FormData();
+    form.append('storeIdentifier', process.env.RECHARGE_STORE_IDENTIFIER);
+
     const sessionRes = await fetch(
       'https://storefront.rechargepayments.com/auth/session',
       {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          // IMPORTANT: do NOT set Content-Type manually
           'X-Recharge-Storefront-Access-Token':
             process.env.RECHARGE_STOREFRONT_TOKEN
         },
-        body: JSON.stringify({
-          storeIdentifier: process.env.RECHARGE_STORE_IDENTIFIER
-        })
+        body: form
       }
     );
 
