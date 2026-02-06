@@ -1,6 +1,6 @@
 export default async function handler(req, res) {
   // ------------------------------
-  // CORS (required)
+  // CORS
   // ------------------------------
   res.setHeader('Access-Control-Allow-Origin', 'https://www.bangnbody.com');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -21,19 +21,16 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Invalid payload' });
     }
 
-    console.log('📦 Incoming bundle payload', {
-      bundle_product_id,
-      items
-    });
+    console.log('📦 Incoming bundle payload', { bundle_product_id, items });
 
     // ------------------------------
-    // 1️⃣ AUTH — multipart/form-data
+    // 1️⃣ CREATE STOREFRONT SESSION
     // ------------------------------
     const form = new FormData();
     form.append('storeIdentifier', process.env.RECHARGE_STORE_IDENTIFIER);
 
-    const authRes = await fetch(
-      'https://storefront.rechargepayments.com/auth/login',
+    const sessionRes = await fetch(
+      'https://storefront.rechargepayments.com/session',
       {
         method: 'POST',
         headers: {
@@ -44,24 +41,24 @@ export default async function handler(req, res) {
       }
     );
 
-    const authText = await authRes.text();
+    const sessionText = await sessionRes.text();
 
-    let authData;
+    let sessionData;
     try {
-      authData = JSON.parse(authText);
+      sessionData = JSON.parse(sessionText);
     } catch {
-      console.error('❌ Auth parse failed:', authText);
+      console.error('❌ Session parse failed:', sessionText);
       return res.status(500).json({
-        error: 'Recharge auth parse failed',
-        raw: authText
+        error: 'Recharge session parse failed',
+        raw: sessionText
       });
     }
 
-    if (!authRes.ok || !authData?.token) {
-      console.error('❌ Recharge auth failed', authData);
+    if (!sessionRes.ok || !sessionData?.token) {
+      console.error('❌ Recharge session failed', sessionData);
       return res.status(401).json({
-        error: 'Recharge auth failed',
-        details: authData
+        error: 'Recharge session failed',
+        details: sessionData
       });
     }
 
@@ -76,7 +73,7 @@ export default async function handler(req, res) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${authData.token}`
+          Authorization: `Bearer ${sessionData.token}`
         },
         body: JSON.stringify({
           bundle_product_id,
